@@ -81,15 +81,26 @@ def main():
         move_obstacles([obs1, obs2, obs3], obstacle_vel)
         show_score(score)
         pg.display.update()
+
+    restart = False
+    while not restart:
+        for event in pg.event.get():
+            if event.type == pg.KEYDOWN and (event.key == pg.K_RETURN or event.key == pg.K_SPACE):
+                main()  # Restart the game
+            if event.type == pg.QUIT:
+                restart = True
+                pg.quit()
+        if restart:
+            break    
+
     main()
 
 
 def add_score_vel(obstacle, score, vel):
     if obstacle.y >= HEIGHT - obstacle.height - 5:
         score += 1
-        print(f'Aumentou o score: {score}')
+        print(f'Score: {score}')
         if score != 0 and score % 10 == 0:
-            print(f'Aumentou a velocidade: {vel}')
             vel += 2
     return [score, vel]
 
@@ -98,10 +109,9 @@ def spawn_obstacles(obs1, obs2, obs3, score, vel):
 
     if obs1.y >= HEIGHT - obs1.height:
         score += 1
-        print(f'Aumentou o score: {score}')
+        print(f'Score: {score}')
         if score != 0 and score % 10 == 0:
             vel += 2
-            print(f'Aumentou a velocidade: {vel}')
 
     spawn_positions = [SPAWN_POINTS['first'], SPAWN_POINTS['second'],
                        SPAWN_POINTS['third'], SPAWN_POINTS['fourth']]
