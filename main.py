@@ -1,5 +1,6 @@
 from random import randint
 import pygame as pg
+
 pg.init()
 pg.font.init()
 
@@ -8,7 +9,7 @@ FPS = 60
 WHITE = (255, 255, 255)
 
 END_GAME_FONT = pg.font.SysFont('cascadia code', 100)
-SCORE_FONT = pg.font.SysFont('cascadia coid', 40)
+SCORE_FONT = pg.font.SysFont('cascadia code', 40)
 
 SPAWN_POINTS = {
     'first': (20, 10),
@@ -17,20 +18,49 @@ SPAWN_POINTS = {
     'fourth': (660, 10)
 }
 
-SAFE_AREA = 880
+SAFE_AREA = 900
 SAFE_AREA_MOVE = 220
 WIDTH = 900
 HEIGHT = 700
-PLAYER_DIMENSIONS = (100, 100)
+PLAYER_DIMENSIONS = (70, 70)
 BACKGROUND_DIMENSIONS = (900, 700)
-OBSTACLE_DIMENSIONS = (WIDTH//4, 80)
+OBSTACLE_DIMENSIONS = (WIDTH // 4, 40)
 
 WIN = pg.display.set_mode((WIDTH, HEIGHT))
 pg.display.set_caption('Cubethon')
 
 PLAYER_IMAGE = pg.image.load('Player.png')
 PLAYER = pg.transform.scale(PLAYER_IMAGE, PLAYER_DIMENSIONS)
-PLAYER_POS = [60, HEIGHT - 100]
+
+
+class Player:
+    def __init__(self):
+        self.image = PLAYER
+        self.rect = self.image.get_rect(topleft=(60, HEIGHT - 100))
+        self.velocity = 0
+        self.acceleration = 1
+        self.deceleration = 0.5
+
+    def move(self, direction):
+        if direction == "left" and self.rect.x > 60:
+            self.velocity -= self.acceleration
+        elif direction == "right" and self.rect.x < SAFE_AREA - self.rect.width:
+            self.velocity += self.acceleration
+
+    def update(self):
+        self.rect.x += self.velocity
+        # Apply deceleration
+        if self.velocity > 0:
+            self.velocity -= self.deceleration
+            if self.velocity < 0:
+                self.velocity = 0
+        elif self.velocity < 0:
+            self.velocity += self.deceleration
+            if self.velocity > 0:
+                self.velocity = 0
+        # Bound the player's motion
+        self.rect.x = max(60, min(self.rect.x, SAFE_AREA - self.rect.width))
+
 
 BACKGROUND_IMAGE = pg.image.load('BackGround.png')
 BACKGROUND = pg.transform.scale(BACKGROUND_IMAGE, BACKGROUND_DIMENSIONS)
@@ -40,7 +70,6 @@ OBSTACLE = pg.transform.scale(OBSTACLE_IMAGE, OBSTACLE_DIMENSIONS)
 
 
 def main():
-
     obstacle_vel = 7
     score = 0
 
@@ -51,57 +80,64 @@ def main():
     obs2 = pg.Rect(SPAWN_POINTS['second'], OBSTACLE_DIMENSIONS)
     obs3 = pg.Rect(SPAWN_POINTS['third'], OBSTACLE_DIMENSIONS)
 
+    player = Player()
+
     while run:
-        player = pg.Rect(PLAYER_POS, PLAYER_DIMENSIONS)
         clock.tick(FPS)
+
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 run = False
-                pg.quit()
 
-            if event.type == pg.KEYDOWN:
-                if PLAYER_POS[0] != 60:
-                    if event.key == pg.K_a or event.key == pg.K_LEFT:
-                        PLAYER_POS[0] -= 220
-                if PLAYER_POS[0] != 720:
-                    if event.key == pg.K_d or event.key == pg.K_RIGHT:
-                        PLAYER_POS[0] += 220
+        keys = pg.key.get_pressed()
+        if keys[pg.K_a] or keys[pg.K_LEFT]:
+            player.move("left")
+        if keys[pg.K_d] or keys[pg.K_RIGHT]:
+            player.move("right")
+
+        player.update()
 
         if obs1.y >= HEIGHT - obs1.height:
             spawn = spawn_obstacles(obs1, obs2, obs3, score, obstacle_vel)
             score = spawn[1]
             obstacle_vel = spawn[2]
 
-        if detect_collision(player, [obs1, obs2, obs3]):
+        if detect_collision(player.rect, [obs1, obs2, obs3]):
             end_game()
             pg.time.delay(5000)
             run = False
 
-        draw_window(obs1, obs2, obs3)
+        draw_window(obs1, obs2, obs3, player)
         move_obstacles([obs1, obs2, obs3], obstacle_vel)
         show_score(score)
         pg.display.update()
-    main()
+
+    restart = False
+    while not restart:
+        for event in pg.event.get():
+            if event.type == pg.KEYDOWN and (event.key == pg.K_RETURN or event.key == pg.K_SPACE):
+                main()  # Restart the game
+            elif event.type == pg.QUIT:
+                restart = True
+
+    pg.quit()
 
 
 def add_score_vel(obstacle, score, vel):
     if obstacle.y >= HEIGHT - obstacle.height - 5:
         score += 1
-        print(f'Aumentou o score: {score}')
+        print(f'Score: {score}')
         if score != 0 and score % 10 == 0:
-            print(f'Aumentou a velocidade: {vel}')
             vel += 2
     return [score, vel]
 
 
 def spawn_obstacles(obs1, obs2, obs3, score, vel):
-
     if obs1.y >= HEIGHT - obs1.height:
         score += 1
-        print(f'Aumentou o score: {score}')
+        print(f'Score: {score}')
         if score != 0 and score % 10 == 0:
             vel += 2
-            print(f'Aumentou a velocidade: {vel}')
 
     spawn_positions = [SPAWN_POINTS['first'], SPAWN_POINTS['second'],
                        SPAWN_POINTS['third'], SPAWN_POINTS['fourth']]
@@ -131,8 +167,7 @@ def show_score(score):
 
 def end_game():
     you_lost_text = END_GAME_FONT.render('You lost!', 1, WHITE)
-    WIN.blit(you_lost_text, (WIDTH/2 - you_lost_text.get_width() /
-                             2, HEIGHT/2 - you_lost_text.get_height()/2))
+    WIN.blit(you_lost_text, (WIDTH / 2 - you_lost_text.get_width() / 2, HEIGHT / 2 - you_lost_text.get_height() / 2))
     pg.display.update()
 
 
@@ -155,9 +190,9 @@ def move_obstacles(obss, vel):
     return spawn
 
 
-def draw_window(obs1, obs2, obs3):
+def draw_window(obs1, obs2, obs3, player):
     WIN.blit(BACKGROUND, (0, 0))
-    WIN.blit(PLAYER, (PLAYER_POS[0], PLAYER_POS[1]))
+    WIN.blit(player.image, (player.rect.x, player.rect.y))
     WIN.blit(OBSTACLE, (obs1.x, obs1.y))
     WIN.blit(OBSTACLE, (obs2.x, obs2.y))
     WIN.blit(OBSTACLE, (obs3.x, obs3.y))
